@@ -24,7 +24,6 @@ import org.openkilda.persistence.repositories.RepositoryFactory;
 import org.openkilda.persistence.repositories.TransitVlanRepository;
 import org.openkilda.wfm.share.flow.resources.EncapsulationResourcesProvider;
 import org.openkilda.wfm.share.flow.resources.ResourceNotAvailableException;
-import org.openkilda.wfm.share.flow.resources.ResourceUtils;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -62,20 +61,23 @@ public class TransitVlanPool implements EncapsulationResourcesProvider<TransitVl
 
     private TransitVlanEncapsulation allocate(Flow flow, PathId pathId) {
         return transactionManager.doInTransaction(() -> {
-            int startValue = ResourceUtils.computeStartValue(minTransitVlan, maxTransitVlan);
-            int availableVlan = transitVlanRepository.findUnassignedTransitVlan(startValue, maxTransitVlan)
-                    .orElse(transitVlanRepository.findUnassignedTransitVlan(minTransitVlan, maxTransitVlan)
-                            .orElseThrow(() -> new ResourceNotAvailableException("No vlan available")));
-            if (availableVlan > maxTransitVlan) {
+            Optional<Integer> availableVlan = transitVlanRepository.findMaximumAssignedVlan()
+                    .map(vlan -> vlan + 1)
+                    .filter(vlan -> vlan <= maxTransitVlan);
+            if (!availableVlan.isPresent()) {
+                availableVlan = Optional.of(transitVlanRepository.findFirstUnassignedVlan(minTransitVlan))
+                        .filter(vlan -> vlan <= maxTransitVlan);
+            }
+            if (!availableVlan.isPresent()) {
                 throw new ResourceNotAvailableException("No vlan available");
             }
 
             TransitVlan transitVlan = TransitVlan.builder()
-                    .vlan(availableVlan)
+                    .vlan(availableVlan.get())
                     .flowId(flow.getFlowId())
                     .pathId(pathId)
                     .build();
-            transitVlanRepository.createOrUpdate(transitVlan);
+            transitVlanRepository.add(transitVlan);
 
             return TransitVlanEncapsulation.builder()
                     .transitVlan(transitVlan)
@@ -90,7 +92,7 @@ public class TransitVlanPool implements EncapsulationResourcesProvider<TransitVl
     public void deallocate(PathId pathId) {
         transactionManager.doInTransaction(() ->
                 transitVlanRepository.findByPathId(pathId, null)
-                        .forEach(transitVlanRepository::delete));
+                        .forEach(transitVlanRepository::remove));
     }
 
     /**

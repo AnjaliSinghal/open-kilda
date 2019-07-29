@@ -100,7 +100,7 @@ public final class IslFsm extends AbstractBaseFsm<IslFsm, IslFsmState, IslFsmEve
         this.bfdManager = bfdManager;
 
         transactionManager = persistenceManager.getTransactionManager();
-        transactionRetryPolicy = transactionManager.makeRetryPolicyBlank()
+        transactionRetryPolicy = transactionManager.makeDefaultRetryPolicy()
                 .withMaxDuration(options.getDbRepeatMaxDurationSeconds(), TimeUnit.SECONDS);
 
         RepositoryFactory repositoryFactory = persistenceManager.getRepositoryFactory();
@@ -364,8 +364,8 @@ public final class IslFsm extends AbstractBaseFsm<IslFsm, IslFsmState, IslFsmEve
     }
 
     private void applyHistory(Isl history) {
-        Endpoint source = Endpoint.of(history.getSrcSwitch().getSwitchId(), history.getSrcPort());
-        Endpoint dest = Endpoint.of(history.getDestSwitch().getSwitchId(), history.getDestPort());
+        Endpoint source = Endpoint.of(history.getSrcSwitchId(), history.getSrcPort());
+        Endpoint dest = Endpoint.of(history.getDestSwitchId(), history.getDestPort());
         transactionManager.doInTransaction(() -> {
             loadPersistentData(source, dest);
             loadPersistentData(dest, source);
@@ -397,7 +397,7 @@ public final class IslFsm extends AbstractBaseFsm<IslFsm, IslFsmState, IslFsmEve
                 end.getDatapath(), end.getPortNumber());
         if (potentialIsl.isPresent()) {
             Isl isl = potentialIsl.get();
-            Endpoint endpoint = Endpoint.of(isl.getDestSwitch().getSwitchId(), isl.getDestPort());
+            Endpoint endpoint = Endpoint.of(isl.getDestSwitchId(), isl.getDestPort());
 
             IslEndpointStatus status = new IslEndpointStatus(mapStatus(isl.getStatus()), isl.getDownReason());
             endpointStatus.put(endpoint, status);
@@ -457,14 +457,10 @@ public final class IslFsm extends AbstractBaseFsm<IslFsm, IslFsmState, IslFsmEve
     private void saveAll(Anchor source, Anchor dest, Instant timeNow, IslEndpointStatus endpointData) {
         Isl link = loadOrCreateIsl(source, dest, timeNow);
 
-        link.setTimeModify(timeNow);
-
         applyIslGenericData(link);
         applyIslMaxBandwidth(link, source.getEndpoint(), dest.getEndpoint());
         applyIslAvailableBandwidth(link, source.getEndpoint(), dest.getEndpoint());
         applyIslStatus(link, endpointData, timeNow);
-
-        pushIslChanges(link);
     }
 
     private void saveStatus(Instant timeNow) {
@@ -477,7 +473,6 @@ public final class IslFsm extends AbstractBaseFsm<IslFsm, IslFsmState, IslFsmEve
         Isl link = loadOrCreateIsl(source, dest, timeNow);
 
         applyIslStatus(link, endpointData, timeNow);
-        pushIslChanges(link);
     }
 
     private void setIslUnstableTime(Instant timeNow) {
@@ -491,9 +486,7 @@ public final class IslFsm extends AbstractBaseFsm<IslFsm, IslFsmState, IslFsmEve
 
         log.debug("Set ISL {} ===> {} unstable time due to physical port down", source, dest);
 
-        link.setTimeModify(timeNow);
         link.setTimeUnstable(timeNow);
-        pushIslChanges(link);
     }
 
     private Socket prepareSocket() {
@@ -514,8 +507,6 @@ public final class IslFsm extends AbstractBaseFsm<IslFsm, IslFsmState, IslFsmEve
         final Endpoint sourceEndpoint = source.getEndpoint();
         final Endpoint destEndpoint = dest.getEndpoint();
         IslBuilder islBuilder = Isl.builder()
-                .timeCreate(timeNow)
-                .timeModify(timeNow)
                 .srcSwitch(source.getSw())
                 .srcPort(sourceEndpoint.getPortNumber())
                 .destSwitch(dest.getSw())
@@ -525,6 +516,7 @@ public final class IslFsm extends AbstractBaseFsm<IslFsm, IslFsmState, IslFsmEve
         Isl link = islBuilder.build();
 
         log.debug("Create new DB object (prefilled): {}", link);
+        islRepository.add(link);
         return link;
     }
 
@@ -544,9 +536,7 @@ public final class IslFsm extends AbstractBaseFsm<IslFsm, IslFsmState, IslFsmEve
                 .status(SwitchStatus.INACTIVE)
                 .description(String.format("auto created as part of ISL %s discovery", discoveryFacts.getReference()))
                 .build();
-
-        switchRepository.createOrUpdate(sw);
-
+        switchRepository.add(sw);
         return sw;
     }
 
@@ -577,8 +567,6 @@ public final class IslFsm extends AbstractBaseFsm<IslFsm, IslFsmState, IslFsmEve
         IslStatus become = mapStatus(endpointData.getStatus());
         IslStatus aggStatus = mapStatus(getAggregatedStatus());
         if (link.getActualStatus() != become || link.getStatus() != aggStatus) {
-            link.setTimeModify(timeNow);
-
             link.setActualStatus(become);
             link.setStatus(aggStatus);
             link.setDownReason(endpointData.getDownReason());
@@ -619,11 +607,6 @@ public final class IslFsm extends AbstractBaseFsm<IslFsm, IslFsmState, IslFsmEve
                 isl.maxBandwidth(maxBandwidth);
             }
         }
-    }
-
-    private void pushIslChanges(Isl link) {
-        log.debug("Write ISL object: {}", link);
-        islRepository.createOrUpdate(link);
     }
 
     private Optional<LinkProps> loadLinkProps(Endpoint source, Endpoint dest) {

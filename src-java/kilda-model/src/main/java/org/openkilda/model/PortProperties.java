@@ -52,6 +52,11 @@ public class PortProperties implements CompositeDataEntity<PortProperties.PortPr
         data = new PortPropertiesDataImpl();
     }
 
+    /**
+     * Cloning constructor which performs deep-copy of properties.
+     *
+     * @param entityToClone the entity to copy properties data from.
+     */
     public PortProperties(@NonNull PortProperties entityToClone) {
         data = PortPropertiesCloner.INSTANCE.copy(entityToClone.getData());
     }

@@ -21,7 +21,6 @@ import static java.util.stream.Collectors.toList;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 
-import org.openkilda.model.Flow;
 import org.openkilda.model.FlowPath;
 import org.openkilda.model.Isl;
 import org.openkilda.model.IslConfig;
@@ -430,7 +429,6 @@ public class AvailableNetworkTest {
         Switch dstSwitch = Switch.builder().switchId(dstDpid).pop(dstPop).build();
 
         FlowPath flowPath = FlowPath.builder()
-                .flow(new Flow())
                 .pathId(new PathId(UUID.randomUUID().toString()))
                 .srcSwitch(srcSwitch)
                 .destSwitch(dstSwitch)

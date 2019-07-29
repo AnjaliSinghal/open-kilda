@@ -58,6 +58,11 @@ public class Isl implements CompositeDataEntity<Isl.IslData> {
         data = new IslDataImpl();
     }
 
+    /**
+     * Cloning constructor which performs deep-copy of ISL.
+     *
+     * @param islToClone the entity to copy ISL data from.
+     */
     public Isl(@NonNull Isl islToClone) {
         data = IslCloner.INSTANCE.copy(islToClone.getData());
     }

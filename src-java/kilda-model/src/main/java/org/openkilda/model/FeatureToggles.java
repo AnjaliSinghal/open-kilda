@@ -62,6 +62,11 @@ public class FeatureToggles implements CompositeDataEntity<FeatureToggles.Featur
         data = new FeatureTogglesDataImpl();
     }
 
+    /**
+     * Cloning constructor which performs deep-copy of toggles.
+     *
+     * @param entityToClone the entity to copy toggles data from.
+     */
     public FeatureToggles(@NonNull FeatureToggles entityToClone) {
         data = FeatureTogglesCloner.INSTANCE.copy(entityToClone.getData());
     }

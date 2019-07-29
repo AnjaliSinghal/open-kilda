@@ -88,8 +88,9 @@ public class StatsRequesterBoltTest {
 
     @Test
     public void doNotRequestGrpcStatsIfToggleIsFalseTest() {
-        FeatureToggles featureToggles = new FeatureToggles();
-        featureToggles.setCollectGrpcStats(false);
+        FeatureToggles featureToggles = FeatureToggles.builder()
+                .collectGrpcStats(false)
+                .build();
 
         when(featureTogglesRepository.find()).thenReturn(Optional.of(featureToggles));
 
@@ -99,8 +100,9 @@ public class StatsRequesterBoltTest {
 
     @Test
     public void doNotRequestGrpcStatsIfNoActiveSwitchesTest() {
-        FeatureToggles featureToggles = new FeatureToggles();
-        featureToggles.setCollectGrpcStats(true);
+        FeatureToggles featureToggles = FeatureToggles.builder()
+                .collectGrpcStats(true)
+                .build();
 
         when(switchRepository.findActive()).thenReturn(Collections.emptyList());
         when(featureTogglesRepository.find()).thenReturn(Optional.of(featureToggles));
@@ -111,8 +113,9 @@ public class StatsRequesterBoltTest {
 
     @Test
     public void doNotRequestGrpcStatsIfNoNoviflowSwitchesTest() {
-        FeatureToggles featureToggles = new FeatureToggles();
-        featureToggles.setCollectGrpcStats(true);
+        FeatureToggles featureToggles = FeatureToggles.builder()
+                .collectGrpcStats(true)
+                .build();
         Switch sw = Switch.builder()
                 .switchId(new SwitchId(1))
                 .build();
@@ -136,8 +139,9 @@ public class StatsRequesterBoltTest {
 
     @Test
     public void requestGrpcStatsForNoviflowSwitchesTest() {
-        FeatureToggles featureToggles = new FeatureToggles();
-        featureToggles.setCollectGrpcStats(true);
+        FeatureToggles featureToggles = FeatureToggles.builder()
+                .collectGrpcStats(true)
+                .build();
         String address = "192.168.1.1";
         Switch sw = Switch.builder()
                 .switchId(new SwitchId(1))

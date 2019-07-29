@@ -52,6 +52,11 @@ public class LinkProps implements CompositeDataEntity<LinkProps.LinkPropsData> {
         data = new LinkPropsDataImpl();
     }
 
+    /**
+     * Cloning constructor which performs deep-copy of link properties.
+     *
+     * @param entityToClone the entity to copy link data from.
+     */
     public LinkProps(@NonNull LinkProps entityToClone) {
         data = LinkPropsCloner.INSTANCE.copy(entityToClone.getData());
     }

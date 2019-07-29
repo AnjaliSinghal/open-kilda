@@ -24,7 +24,6 @@ import org.openkilda.persistence.repositories.RepositoryFactory;
 import org.openkilda.persistence.repositories.VxlanRepository;
 import org.openkilda.wfm.share.flow.resources.EncapsulationResourcesProvider;
 import org.openkilda.wfm.share.flow.resources.ResourceNotAvailableException;
-import org.openkilda.wfm.share.flow.resources.ResourceUtils;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -62,20 +61,23 @@ public class VxlanPool implements EncapsulationResourcesProvider<VxlanEncapsulat
 
     private VxlanEncapsulation allocate(Flow flow, PathId pathId) {
         return transactionManager.doInTransaction(() -> {
-            int startValue = ResourceUtils.computeStartValue(minVxlan, maxVxlan);
-            int availableVxlan = vxlanRepository.findUnassignedVxlan(startValue, maxVxlan)
-                    .orElse(vxlanRepository.findUnassignedVxlan(minVxlan, maxVxlan)
-                            .orElseThrow(() -> new ResourceNotAvailableException("No vxlan available")));
-            if (availableVxlan > maxVxlan) {
+            Optional<Integer> availableVxlan = vxlanRepository.findMaximumAssignedVxlan()
+                    .map(vxlan -> vxlan + 1)
+                    .filter(vxlan -> vxlan <= maxVxlan);
+            if (!availableVxlan.isPresent()) {
+                availableVxlan = Optional.of(vxlanRepository.findFirstUnassignedVxlan(minVxlan))
+                        .filter(vxlan -> vxlan <= maxVxlan);
+            }
+            if (!availableVxlan.isPresent()) {
                 throw new ResourceNotAvailableException("No vxlan available");
             }
 
             Vxlan vxlan = Vxlan.builder()
-                    .vni(availableVxlan)
+                    .vni(availableVxlan.get())
                     .flowId(flow.getFlowId())
                     .pathId(pathId)
                     .build();
-            vxlanRepository.createOrUpdate(vxlan);
+            vxlanRepository.add(vxlan);
 
             return VxlanEncapsulation.builder()
                     .vxlan(vxlan)
@@ -90,7 +92,7 @@ public class VxlanPool implements EncapsulationResourcesProvider<VxlanEncapsulat
     public void deallocate(PathId pathId) {
         transactionManager.doInTransaction(() ->
                 vxlanRepository.findByPathId(pathId, null)
-                        .forEach(vxlanRepository::delete));
+                        .forEach(vxlanRepository::remove));
     }
 
     /**
