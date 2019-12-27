@@ -57,6 +57,7 @@ import org.openkilda.persistence.repositories.SwitchRepository;
 import org.openkilda.wfm.share.model.Endpoint;
 import org.openkilda.wfm.topology.network.model.LinkStatus;
 import org.openkilda.wfm.topology.network.model.NetworkOptions;
+import org.openkilda.wfm.topology.network.model.OnlineStatus;
 import org.openkilda.wfm.topology.network.model.facts.HistoryFacts;
 
 import com.google.common.collect.ImmutableList;
@@ -233,9 +234,9 @@ public class NetworkSwitchServiceTest {
         //System.out.println(mockingDetails(carrier).printInvocations());
         //System.out.println(mockingDetails(switchRepository).printInvocations());
 
-        verify(carrier).setOnlineMode(Endpoint.of(alphaDatapath, ports.get(0).getNumber()), false);
+        verify(carrier).setOnlineMode(Endpoint.of(alphaDatapath, ports.get(0).getNumber()), OnlineStatus.OFFLINE);
         verify(carrier).setBfdPortOnlineMode(Endpoint.of(alphaDatapath, ports.get(1).getNumber()), false);
-        verify(carrier).setOnlineMode(Endpoint.of(alphaDatapath, ports.get(2).getNumber()), false);
+        verify(carrier).setOnlineMode(Endpoint.of(alphaDatapath, ports.get(2).getNumber()), OnlineStatus.OFFLINE);
         verify(carrier).setBfdPortOnlineMode(Endpoint.of(alphaDatapath, ports.get(3).getNumber()), false);
 
         verify(switchRepository).createOrUpdate(argThat(sw ->
@@ -277,8 +278,8 @@ public class NetworkSwitchServiceTest {
 
         verify(carrier).setupPortHandler(Endpoint.of(alphaDatapath, 1), islAtoB);
         verify(carrier).setupPortHandler(Endpoint.of(alphaDatapath, 2), islAtoB2);
-        verify(carrier).setOnlineMode(Endpoint.of(alphaDatapath, 1), false);
-        verify(carrier).setOnlineMode(Endpoint.of(alphaDatapath, 2), false);
+        verify(carrier).setOnlineMode(Endpoint.of(alphaDatapath, 1), OnlineStatus.OFFLINE);
+        verify(carrier).setOnlineMode(Endpoint.of(alphaDatapath, 2), OnlineStatus.OFFLINE);
 
         verify(switchRepository).createOrUpdate(argThat(sw ->
                 sw.getStatus() == SwitchStatus.INACTIVE && sw.getSwitchId() == alphaDatapath));
@@ -392,9 +393,9 @@ public class NetworkSwitchServiceTest {
         // System.out.println(mockingDetails(carrier).printInvocations());
         //System.out.println(mockingDetails(switchRepository).printInvocations());
 
-        verify(carrier).setOnlineMode(Endpoint.of(alphaDatapath, ports.get(0).getNumber()), true);
+        verify(carrier).setOnlineMode(Endpoint.of(alphaDatapath, ports.get(0).getNumber()), OnlineStatus.ONLINE);
         verify(carrier).setBfdPortOnlineMode(Endpoint.of(alphaDatapath, ports.get(1).getNumber()), true);
-        verify(carrier).setOnlineMode(Endpoint.of(alphaDatapath, ports.get(2).getNumber()), true);
+        verify(carrier).setOnlineMode(Endpoint.of(alphaDatapath, ports.get(2).getNumber()), OnlineStatus.ONLINE);
         verify(carrier).setBfdPortOnlineMode(Endpoint.of(alphaDatapath, ports.get(3).getNumber()), true);
 
         verify(carrier).setPortLinkMode(Endpoint.of(alphaDatapath, ports2.get(2).getNumber()),
@@ -475,12 +476,12 @@ public class NetworkSwitchServiceTest {
 
         verify(carrier).removeBfdPortHandler(Endpoint.of(alphaDatapath, 1 + BFD_LOGICAL_PORT_OFFSET));
         verify(carrier).setupPortHandler(Endpoint.of(alphaDatapath, 1 + BFD_LOGICAL_PORT_OFFSET), null);
-        verify(carrier).setOnlineMode(Endpoint.of(alphaDatapath, 1 + BFD_LOGICAL_PORT_OFFSET), true);
+        verify(carrier).setOnlineMode(Endpoint.of(alphaDatapath, 1 + BFD_LOGICAL_PORT_OFFSET), OnlineStatus.ONLINE);
         verify(carrier).setPortLinkMode(Endpoint.of(alphaDatapath, 1 + BFD_LOGICAL_PORT_OFFSET), LinkStatus.DOWN);
 
         verify(carrier).removeBfdPortHandler(Endpoint.of(alphaDatapath, 2 + BFD_LOGICAL_PORT_OFFSET));
         verify(carrier).setupPortHandler(Endpoint.of(alphaDatapath, 2 + BFD_LOGICAL_PORT_OFFSET), null);
-        verify(carrier).setOnlineMode(Endpoint.of(alphaDatapath, 2 + BFD_LOGICAL_PORT_OFFSET), true);
+        verify(carrier).setOnlineMode(Endpoint.of(alphaDatapath, 2 + BFD_LOGICAL_PORT_OFFSET), OnlineStatus.ONLINE);
         verify(carrier).setPortLinkMode(Endpoint.of(alphaDatapath, 2 + BFD_LOGICAL_PORT_OFFSET), LinkStatus.UP);
     }
 
@@ -530,7 +531,7 @@ public class NetworkSwitchServiceTest {
         verify(carrier).setupPortHandler(Endpoint.of(alphaDatapath, 1), null);
         verify(carrier).setupBfdPortHandler(Endpoint.of(alphaDatapath, 1 + BFD_LOGICAL_PORT_OFFSET), 1);
 
-        verify(carrier).setOnlineMode(Endpoint.of(alphaDatapath, 1), true);
+        verify(carrier).setOnlineMode(Endpoint.of(alphaDatapath, 1), OnlineStatus.ONLINE);
         verify(carrier).setBfdPortOnlineMode(Endpoint.of(alphaDatapath, 1 + BFD_LOGICAL_PORT_OFFSET), true);
     }
 
@@ -607,7 +608,7 @@ public class NetworkSwitchServiceTest {
         service.switchPortEvent(speakerPortEvent);
 
         verify(carrier).setupPortHandler(endpoint, null);
-        verify(carrier).setOnlineMode(endpoint, true);
+        verify(carrier).setOnlineMode(endpoint, OnlineStatus.ONLINE);
         verify(carrier).setPortLinkMode(endpoint, LinkStatus.UP);
         verify(carrier).sendAffectedFlowRerouteRequest(alphaDatapath);
 
@@ -674,10 +675,10 @@ public class NetworkSwitchServiceTest {
         verify(carrier).setupPortHandler(Endpoint.of(alphaDatapath, ports.get(2).getNumber()), null);
         verify(carrier).setupPortHandler(Endpoint.of(alphaDatapath, ports.get(3).getNumber()), null);
 
-        verify(carrier).setOnlineMode(Endpoint.of(alphaDatapath, ports.get(0).getNumber()), true);
-        verify(carrier).setOnlineMode(Endpoint.of(alphaDatapath, ports.get(1).getNumber()), true);
-        verify(carrier).setOnlineMode(Endpoint.of(alphaDatapath, ports.get(2).getNumber()), true);
-        verify(carrier).setOnlineMode(Endpoint.of(alphaDatapath, ports.get(3).getNumber()), true);
+        verify(carrier).setOnlineMode(Endpoint.of(alphaDatapath, ports.get(0).getNumber()), OnlineStatus.ONLINE);
+        verify(carrier).setOnlineMode(Endpoint.of(alphaDatapath, ports.get(1).getNumber()), OnlineStatus.ONLINE);
+        verify(carrier).setOnlineMode(Endpoint.of(alphaDatapath, ports.get(2).getNumber()), OnlineStatus.ONLINE);
+        verify(carrier).setOnlineMode(Endpoint.of(alphaDatapath, ports.get(3).getNumber()), OnlineStatus.ONLINE);
 
         verify(carrier).setPortLinkMode(Endpoint.of(alphaDatapath, ports.get(2).getNumber()),
                                         LinkStatus.of(ports.get(2).getState()));
@@ -889,9 +890,9 @@ public class NetworkSwitchServiceTest {
         verify(carrier).setupPortHandler(Endpoint.of(alphaDatapath, ports.get(2).getNumber()), null);
         verify(carrier).setupBfdPortHandler(Endpoint.of(alphaDatapath, ports.get(3).getNumber()), 2);
 
-        verify(carrier).setOnlineMode(Endpoint.of(alphaDatapath, ports.get(0).getNumber()), true);
+        verify(carrier).setOnlineMode(Endpoint.of(alphaDatapath, ports.get(0).getNumber()), OnlineStatus.ONLINE);
         verify(carrier).setBfdPortOnlineMode(Endpoint.of(alphaDatapath, ports.get(1).getNumber()), true);
-        verify(carrier).setOnlineMode(Endpoint.of(alphaDatapath, ports.get(2).getNumber()), true);
+        verify(carrier).setOnlineMode(Endpoint.of(alphaDatapath, ports.get(2).getNumber()), OnlineStatus.ONLINE);
         verify(carrier).setBfdPortOnlineMode(Endpoint.of(alphaDatapath, ports.get(3).getNumber()), true);
 
         verify(carrier).setPortLinkMode(Endpoint.of(alphaDatapath, ports.get(2).getNumber()),
