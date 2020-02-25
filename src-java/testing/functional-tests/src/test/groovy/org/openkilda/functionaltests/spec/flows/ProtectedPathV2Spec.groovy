@@ -442,7 +442,7 @@ class ProtectedPathV2Spec extends HealthCheckSpecification {
     }
 
     @Tidy
-    def "Unable to create a flow with protected path when there is not enough bandwidth"() {
+    def "Able to create a flow with protected path when there is not enough bandwidth"() {
         given: "Two active neighboring switches"
         def isls = topology.getIslsForActiveSwitches()
         def (srcSwitch, dstSwitch) = [isls.first().srcSwitch, isls.first().dstSwitch]
@@ -455,24 +455,23 @@ class ProtectedPathV2Spec extends HealthCheckSpecification {
         def flow = flowHelperV2.randomFlow(srcSwitch, dstSwitch)
         flow.maximumBandwidth = bandwidth
         flow.allocateProtectedPath = true
-        flowHelperV2.addFlow(flow)
+        northboundV2.addFlow(flow)
 
-        then: "Human readable error is returned"
-        def exc = thrown(HttpClientErrorException)
-        exc.rawStatusCode == 404
-        def errorDetails = exc.responseBodyAsString.to(MessageError)
-        errorDetails.errorMessage == "Could not create flow"
-        errorDetails.errorDescription == "Not enough bandwidth or no path found. " +
-                "Couldn't find non overlapping protected path"
+        then: "Flow state is changed to DEGRADED"
+        Wrappers.wait(WAIT_OFFSET) { assert northbound.getFlowStatus(flow.flowId).status == FlowState.DEGRADED }
+        verifyAll(northbound.getFlow(flow.flowId).flowStatusDetails) {
+            mainFlowPathStatus == "Up"
+            protectedFlowPathStatus == "Down"
+        }
 
         cleanup: "Restore available bandwidth"
         isls.each { database.resetIslBandwidth(it) }
-        !exc && flowHelperV2.deleteFlow(flow.flowId)
+        flowHelperV2.deleteFlow(flow.flowId)
     }
 
     @Tidy
     @Tags(LOW_PRIORITY)
-    def "Unable to update a flow to enable protected path when there is not enough bandwidth"() {
+    def "Able to update a flow to enable protected path when there is not enough bandwidth"() {
         given: "Two active neighboring switches"
         def isls = topology.getIslsForActiveSwitches()
         def (srcSwitch, dstSwitch) = [isls.first().srcSwitch, isls.first().dstSwitch]
@@ -493,13 +492,12 @@ class ProtectedPathV2Spec extends HealthCheckSpecification {
         when: "Update flow: enable protected path"
         northboundV2.updateFlow(flow.flowId, flow.tap { it.allocateProtectedPath = true })
 
-        then: "Human readable error is returned"
-        def exc = thrown(HttpClientErrorException)
-        exc.rawStatusCode == 404
-        def errorDetails = exc.responseBodyAsString.to(MessageError)
-        errorDetails.errorMessage == "Could not update flow"
-        errorDetails.errorDescription == "Not enough bandwidth or no path found. " +
-                "Couldn't find non overlapping protected path"
+        then: "Flow state is changed to DEGRADED"
+        Wrappers.wait(WAIT_OFFSET) { assert northbound.getFlowStatus(flow.flowId).status == FlowState.DEGRADED }
+        verifyAll(northbound.getFlow(flow.flowId).flowStatusDetails) {
+            mainFlowPathStatus == "Up"
+            protectedFlowPathStatus == "Down"
+        }
 
         cleanup: "Delete the flow and restore available bandwidth"
         flowHelperV2.deleteFlow(flow.flowId)
@@ -635,7 +633,7 @@ class ProtectedPathV2Spec extends HealthCheckSpecification {
     @Tidy
     @Unroll
     @IterationTag(tags = [LOW_PRIORITY], iterationNameRegex = /unmetered/)
-    def "Unable to create #flowDescription flow with protected path if all alternative paths are unavailable"() {
+    def "Able to create #flowDescription flow with protected path if all alternative paths are unavailable"() {
         given: "Two active neighboring switches without alt paths"
         def switchPair = topologyHelper.getNeighboringSwitchPair()
         List<PathNode> broughtDownPorts = []
@@ -658,23 +656,22 @@ class ProtectedPathV2Spec extends HealthCheckSpecification {
         flow.allocateProtectedPath = true
         flow.maximumBandwidth = bandwidth
         flow.ignoreBandwidth = bandwidth == 0
-        flowHelperV2.addFlow(flow)
+        northboundV2.addFlow(flow)
 
-        then: "Human readable error is returned"
-        def exc = thrown(HttpClientErrorException)
-        exc.rawStatusCode == 404
-        def errorDetails = exc.responseBodyAsString.to(MessageError)
-        errorDetails.errorMessage == "Could not create flow"
-        errorDetails.errorDescription == "Not enough bandwidth or no path found." +
-                " Couldn't find non overlapping protected path"
+        then: "Flow state is changed to DEGRADED"
+        Wrappers.wait(WAIT_OFFSET) { assert northbound.getFlowStatus(flow.flowId).status == FlowState.DEGRADED }
+        verifyAll(northbound.getFlow(flow.flowId).flowStatusDetails) {
+            mainFlowPathStatus == "Up"
+            protectedFlowPathStatus == "Down"
+        }
 
         cleanup: "Restore topology, delete flows and reset costs"
         broughtDownPorts.every { antiflap.portUp(it.switchId, it.portNo) }
+        flowHelperV2.deleteFlow(flow.flowId)
         Wrappers.wait(discoveryInterval + WAIT_OFFSET) {
             northbound.getAllLinks().each { assert it.state != IslChangeType.FAILED }
         }
         database.resetCosts()
-        !exc && flowHelperV2.deleteFlow(flow.flowId)
 
         where:
         flowDescription | bandwidth
@@ -685,7 +682,7 @@ class ProtectedPathV2Spec extends HealthCheckSpecification {
     @Tidy
     @Unroll
     @IterationTag(tags = [LOW_PRIORITY], iterationNameRegex = /unmetered/)
-    def "Unable to update #flowDescription flow to enable protected path if all alternative paths are unavailable"() {
+    def "Able to update #flowDescription flow to enable protected path if all alternative paths are unavailable"() {
         given: "Two active neighboring switches with two not overlapping paths at least"
         def switchPair = topologyHelper.getAllNeighboringSwitchPairs().find {
             it.paths.unique(false) { a, b -> a.intersect(b) == [] ? 1 : 0 }.size() >= 2
@@ -715,13 +712,12 @@ class ProtectedPathV2Spec extends HealthCheckSpecification {
         when: "Update flow: enable protected path(allocateProtectedPath=true)"
         northboundV2.updateFlow(flow.flowId, flow.tap { it.allocateProtectedPath = true })
 
-        then: "Human readable error is returned"
-        def exc = thrown(HttpClientErrorException)
-        exc.rawStatusCode == 404
-        def errorDetails = exc.responseBodyAsString.to(MessageError)
-        errorDetails.errorMessage == "Could not update flow"
-        errorDetails.errorDescription == "Not enough bandwidth or no path found." +
-                " Couldn't find non overlapping protected path"
+        then: "Flow state is changed to DEGRADED"
+        Wrappers.wait(WAIT_OFFSET) { assert northbound.getFlowStatus(flow.flowId).status == FlowState.DEGRADED }
+        verifyAll(northbound.getFlow(flow.flowId).flowStatusDetails) {
+            mainFlowPathStatus == "Up"
+            protectedFlowPathStatus == "Down"
+        }
 
         cleanup: "Restore topology, delete flows and reset costs"
         broughtDownPorts.every { antiflap.portUp(it.switchId, it.portNo) }

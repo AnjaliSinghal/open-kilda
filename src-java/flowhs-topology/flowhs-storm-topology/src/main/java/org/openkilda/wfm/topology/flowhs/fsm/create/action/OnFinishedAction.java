@@ -15,6 +15,9 @@
 
 package org.openkilda.wfm.topology.flowhs.fsm.create.action;
 
+import static java.lang.String.format;
+
+import org.openkilda.model.FlowStatus;
 import org.openkilda.wfm.share.logger.FlowOperationsDashboardLogger;
 import org.openkilda.wfm.topology.flowhs.fsm.common.actions.HistoryRecordingAction;
 import org.openkilda.wfm.topology.flowhs.fsm.create.FlowCreateContext;
@@ -35,10 +38,24 @@ public class OnFinishedAction extends HistoryRecordingAction<FlowCreateFsm, Stat
 
     @Override
     public void perform(State from, State to, Event event, FlowCreateContext context, FlowCreateFsm stateMachine) {
+        if (stateMachine.getFlowStatus() == FlowStatus.UP) {
+            sendPeriodicPingNotification(stateMachine);
+            dashboardLogger.onSuccessfulFlowCreate(stateMachine.getFlowId());
+            stateMachine.saveActionToHistory("Flow was created successfully");
+        } else if (stateMachine.getFlowStatus() == FlowStatus.DEGRADED) {
+            sendPeriodicPingNotification(stateMachine);
+            dashboardLogger.onFailedFlowCreate(stateMachine.getFlowId(), "Protected path not found");
+            stateMachine.saveActionToHistory("Main flow path created successfully but no protected path found");
+        } else {
+            stateMachine.saveActionToHistory("Flow create completed",
+                    format("Flow create completed with status %s and error %s", stateMachine.getFlowStatus(),
+                            stateMachine.getErrorReason()));
+        }
+    }
+
+    private void sendPeriodicPingNotification(FlowCreateFsm stateMachine) {
         RequestedFlow requestedFlow = stateMachine.getTargetFlow();
         stateMachine.getCarrier().sendPeriodicPingNotification(requestedFlow.getFlowId(),
                 requestedFlow.isPeriodicPings());
-        dashboardLogger.onSuccessfulFlowCreate(stateMachine.getFlowId());
-        stateMachine.saveActionToHistory("Flow was created successfully");
     }
 }

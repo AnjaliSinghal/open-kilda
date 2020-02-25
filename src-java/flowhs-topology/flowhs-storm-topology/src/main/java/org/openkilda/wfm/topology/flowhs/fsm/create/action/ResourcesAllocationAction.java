@@ -220,7 +220,8 @@ public class ResourcesAllocationAction extends NbTrackableAction<FlowCreateFsm, 
         // non ingress
         requestFactories = stateMachine.getNonIngressCommands();
         requestFactories.addAll(commandBuilder.buildAllExceptIngress(commandContext, flow));
-        if (flow.isAllocateProtectedPath()) {
+        if (flow.isAllocateProtectedPath()
+                && flow.getProtectedForwardPath() != null && flow.getProtectedReversePath() != null) {
             requestFactories.addAll(commandBuilder.buildAllExceptIngress(
                     commandContext, flow,
                     flow.getProtectedForwardPath(), flow.getProtectedReversePath()));
@@ -266,7 +267,7 @@ public class ResourcesAllocationAction extends NbTrackableAction<FlowCreateFsm, 
                         || flowPathBuilder.arePathsOverlapped(protectedPath.getReverse(), flow.getReversePath());
         if (overlappingProtectedPathFound) {
             log.info("Couldn't find non overlapping protected path. Result flow state: {}", flow);
-            throw new UnroutableFlowException("Couldn't find non overlapping protected path", flow.getFlowId());
+            return;
         }
 
         log.debug("Creating the protected path {} for flow {}", protectedPath, flow);
@@ -328,7 +329,8 @@ public class ResourcesAllocationAction extends NbTrackableAction<FlowCreateFsm, 
                         flow.getForwardPathId(), flow.getReversePathId()),
                 primaryPathsDumpData);
 
-        if (flow.isAllocateProtectedPath()) {
+        if (flow.isAllocateProtectedPath()
+                && flow.getProtectedForwardPath() != null && flow.getProtectedReversePath() != null) {
             FlowDumpData protectedPathsDumpData = HistoryMapper.INSTANCE.map(flow, flow.getProtectedForwardPath(),
                     flow.getProtectedReversePath(), DumpType.STATE_AFTER);
             stateMachine.saveActionWithDumpToHistory("New protected paths were created",

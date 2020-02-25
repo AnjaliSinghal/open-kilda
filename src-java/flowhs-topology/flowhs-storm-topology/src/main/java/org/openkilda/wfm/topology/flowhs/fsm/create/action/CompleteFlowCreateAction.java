@@ -28,6 +28,7 @@ import org.openkilda.wfm.topology.flowhs.fsm.create.FlowCreateContext;
 import org.openkilda.wfm.topology.flowhs.fsm.create.FlowCreateFsm;
 import org.openkilda.wfm.topology.flowhs.fsm.create.FlowCreateFsm.Event;
 import org.openkilda.wfm.topology.flowhs.fsm.create.FlowCreateFsm.State;
+import org.openkilda.wfm.topology.flowhs.model.RequestedFlow;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -50,16 +51,21 @@ public class CompleteFlowCreateAction extends FlowProcessingAction<FlowCreateFsm
                         "Couldn't complete flow creation. The flow was deleted");
             }
 
+            RequestedFlow flow = stateMachine.getTargetFlow();
             flowPathRepository.updateStatus(stateMachine.getForwardPathId(), FlowPathStatus.ACTIVE);
             flowPathRepository.updateStatus(stateMachine.getReversePathId(), FlowPathStatus.ACTIVE);
+            FlowStatus flowStatus = flow.isAllocateProtectedPath() ? FlowStatus.DEGRADED : FlowStatus.UP;
             if (stateMachine.getProtectedForwardPathId() != null && stateMachine.getProtectedReversePathId() != null) {
                 flowPathRepository.updateStatus(stateMachine.getProtectedForwardPathId(), FlowPathStatus.ACTIVE);
                 flowPathRepository.updateStatus(stateMachine.getProtectedReversePathId(), FlowPathStatus.ACTIVE);
+                flowStatus = FlowStatus.UP;
             }
 
-            flowRepository.updateStatus(flowId, FlowStatus.UP);
-            dashboardLogger.onFlowStatusUpdate(flowId, FlowStatus.UP);
-            stateMachine.saveActionToHistory(format("The flow status was set to %s", FlowStatus.UP));
+            dashboardLogger.onFlowStatusUpdate(flowId, flowStatus);
+            flowRepository.updateStatus(flowId, flowStatus);
+            stateMachine.setFlowStatus(flowStatus);
+
+            stateMachine.saveActionToHistory(format("The flow status was set to %s", flowStatus));
         });
     }
 }

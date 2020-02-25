@@ -100,6 +100,44 @@ public class FlowCreateServiceTest extends AbstractFlowTest {
         verifyFlowPathStatus(result.getProtectedReversePath(), FlowPathStatus.ACTIVE, "protected-reverse");
     }
 
+    @Test
+    public void shouldCreateFlowWithAllocatedProtectedPathFlag() throws Exception {
+        FlowRequest request = makeRequest()
+                .flowId("test_successful_flow_id")
+                .allocateProtectedPath(true)
+                .build();
+
+        when(pathComputer.getPath(makeFlowArgumentMatch(request.getFlowId())))
+                .thenReturn(make2SwitchesPathPair())
+                .thenReturn(make2SwitchesPathPair());
+
+        String key = "successful_flow_create";
+        FlowCreateService service = makeService();
+        service.handleRequest(key, new CommandContext(), request);
+
+        Flow inProgress = verifyFlowStatus(request.getFlowId(), FlowStatus.IN_PROGRESS);
+        verifyFlowPathStatus(inProgress.getForwardPath(), FlowPathStatus.IN_PROGRESS, "forward");
+        verifyFlowPathStatus(inProgress.getReversePath(), FlowPathStatus.IN_PROGRESS, "reverse");
+
+        verifyNorthboundSuccessResponse(carrier);
+
+        FlowSegmentRequest segmentRequest;
+        while ((segmentRequest = requests.poll()) != null) {
+            if (segmentRequest.isVerifyRequest()) {
+                service.handleAsyncResponse(key, buildResponseOnVerifyRequest(segmentRequest));
+            } else {
+                handleResponse(service, key, segmentRequest);
+            }
+        }
+
+        Flow result = verifyFlowStatus(request.getFlowId(), FlowStatus.DEGRADED);
+        verifyFlowPathStatus(result.getForwardPath(), FlowPathStatus.ACTIVE, "forward");
+        verifyFlowPathStatus(result.getReversePath(), FlowPathStatus.ACTIVE, "reverse");
+        Assert.assertTrue(result.isAllocateProtectedPath());
+        Assert.assertNull(result.getProtectedForwardPath());
+        Assert.assertNull(result.getProtectedReversePath());
+    }
+
     private Flow testHappyPath(FlowRequest flowRequest, String key) {
         FlowCreateService service = makeService();
         service.handleRequest(key, new CommandContext(), flowRequest);
