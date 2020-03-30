@@ -15,13 +15,13 @@
 
 package org.openkilda.wfm.topology.flowhs.service;
 
-import org.openkilda.messaging.Message;
+import org.openkilda.messaging.command.flow.FlowRequest;
 
-public interface FlowUpdateHubCarrier extends FlowGenericCarrier {
+public interface FlowSwapEndpointsHubCarrier extends FlowGenericCarrier {
     /**
-     * Sends a response to SwapEndpointHub after the update operation is completed.
+     * Sends a FlowUpdate request.
      */
-    void sendHubSwapEndpointsResponse(Message message);
+    void sendFlowUpdateRequest(FlowRequest flowRequest);
 
     /**
      * Cancels timeout callback.

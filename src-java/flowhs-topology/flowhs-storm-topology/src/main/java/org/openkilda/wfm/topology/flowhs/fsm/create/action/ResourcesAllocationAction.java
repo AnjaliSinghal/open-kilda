@@ -20,9 +20,6 @@ import static java.lang.String.format;
 import org.openkilda.floodlight.api.request.factory.FlowSegmentRequestFactory;
 import org.openkilda.messaging.Message;
 import org.openkilda.messaging.error.ErrorType;
-import org.openkilda.messaging.info.InfoData;
-import org.openkilda.messaging.info.InfoMessage;
-import org.openkilda.messaging.info.flow.FlowResponse;
 import org.openkilda.model.Cookie;
 import org.openkilda.model.Flow;
 import org.openkilda.model.FlowPath;
@@ -47,7 +44,6 @@ import org.openkilda.wfm.share.flow.resources.FlowResourcesManager;
 import org.openkilda.wfm.share.flow.resources.ResourceAllocationException;
 import org.openkilda.wfm.share.history.model.FlowDumpData;
 import org.openkilda.wfm.share.history.model.FlowDumpData.DumpType;
-import org.openkilda.wfm.share.mappers.FlowMapper;
 import org.openkilda.wfm.share.mappers.HistoryMapper;
 import org.openkilda.wfm.topology.flowhs.exception.FlowProcessingException;
 import org.openkilda.wfm.topology.flowhs.fsm.common.actions.NbTrackableAction;
@@ -140,10 +136,7 @@ public class ResourcesAllocationAction extends NbTrackableAction<FlowCreateFsm, 
             stateMachine.fireNext(context);
         }
 
-        CommandContext commandContext = stateMachine.getCommandContext();
-        InfoData flowData = new FlowResponse(FlowMapper.INSTANCE.map(flow, getDiverseWithFlowIds(flow)));
-        Message response = new InfoMessage(flowData, commandContext.getCreateTime(), commandContext.getCorrelationId());
-        return Optional.of(response);
+        return Optional.of(buildResponseMessage(flow, stateMachine.getCommandContext()));
     }
 
     private Optional<Flow> getFlow(FlowCreateContext context, String flowId) {

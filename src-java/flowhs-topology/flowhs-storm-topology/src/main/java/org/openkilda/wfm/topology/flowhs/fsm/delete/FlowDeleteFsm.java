@@ -102,7 +102,7 @@ public final class FlowDeleteFsm extends NbTrackableFsm<FlowDeleteFsm, State, Ev
     }
 
     @Override
-    public void sendResponse(Message message) {
+    public void sendNorthboundResponse(Message message) {
         carrier.sendNorthboundResponse(message);
     }
 

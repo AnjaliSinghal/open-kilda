@@ -1,4 +1,4 @@
-/* Copyright 2019 Telstra Open Source
+/* Copyright 2020 Telstra Open Source
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
  *   you may not use this file except in compliance with the License.
@@ -21,6 +21,8 @@ import org.openkilda.model.SwitchId;
 
 import lombok.Builder;
 import lombok.Data;
+
+import java.util.Set;
 
 @Data
 @Builder
@@ -51,4 +53,7 @@ public class RequestedFlow {
 
     private boolean srcWithMultiTable;
     private boolean destWithMultiTable;
+
+    boolean bulkUpdate;
+    Set<String> bulkUpdateFlowIds;
 }

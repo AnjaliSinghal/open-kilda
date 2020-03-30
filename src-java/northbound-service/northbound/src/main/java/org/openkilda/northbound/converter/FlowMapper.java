@@ -153,6 +153,8 @@ public interface FlowMapper {
             + "request.getDestination().getDetectConnectedDevices().isArp()))")
     @Mapping(target = "transitEncapsulationId", ignore = true)
     @Mapping(target = "type", ignore = true)
+    @Mapping(target = "bulkUpdate", ignore = true)
+    @Mapping(target = "bulkUpdateFlowIds", ignore = true)
     FlowRequest toFlowRequest(FlowRequestV2 request);
 
     default FlowRequest toFlowCreateRequest(FlowRequestV2 source) {

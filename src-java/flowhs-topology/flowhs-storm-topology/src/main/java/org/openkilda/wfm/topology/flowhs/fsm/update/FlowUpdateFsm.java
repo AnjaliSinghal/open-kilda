@@ -113,8 +113,12 @@ public final class FlowUpdateFsm extends FlowPathSwappingFsm<FlowUpdateFsm, Stat
     }
 
     @Override
-    public void sendResponse(Message message) {
+    public void sendNorthboundResponse(Message message) {
         carrier.sendNorthboundResponse(message);
+    }
+
+    public void sendHubSwapEndpointsResponse(Message message) {
+        carrier.sendHubSwapEndpointsResponse(message);
     }
 
     public static class Factory {

@@ -13,25 +13,15 @@
  *   limitations under the License.
  */
 
-package org.openkilda.wfm.topology.flowhs.fsm.common;
+package org.openkilda.wfm.topology.flowhs.fsm.swapendpoints;
 
-import org.openkilda.messaging.Message;
-import org.openkilda.wfm.CommandContext;
+import org.openkilda.messaging.MessageData;
 
-import lombok.Getter;
-import lombok.Setter;
-import org.squirrelframework.foundation.fsm.StateMachine;
+import lombok.AllArgsConstructor;
+import lombok.Data;
 
-@Getter
-@Setter
-public abstract class NbTrackableFsm<T extends StateMachine<T, S, E, C>, S, E, C>
-        extends FlowProcessingFsm<T, S, E, C> {
-
-    private Message operationResultMessage;
-
-    public NbTrackableFsm(CommandContext commandContext) {
-        super(commandContext);
-    }
-
-    public abstract void sendNorthboundResponse(Message message);
+@Data
+@AllArgsConstructor
+public class FlowSwapEndpointsContext {
+    private MessageData response;
 }

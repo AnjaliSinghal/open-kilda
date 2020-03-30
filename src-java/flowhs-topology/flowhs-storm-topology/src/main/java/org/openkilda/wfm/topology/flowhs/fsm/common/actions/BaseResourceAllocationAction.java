@@ -106,22 +106,28 @@ public abstract class BaseResourceAllocationAction<T extends FlowPathSwappingFsm
             stateMachine.saveActionToHistory(errorMessage);
             stateMachine.fireNoPathFound(errorMessage);
 
-            return Optional.of(buildErrorMessage(stateMachine, ErrorType.NOT_FOUND,
-                    getGenericErrorMessage(), errorMessage));
+            Message message = buildErrorMessage(stateMachine, ErrorType.NOT_FOUND,
+                    getGenericErrorMessage(), errorMessage);
+            stateMachine.setOperationResultMessage(message);
+            return Optional.of(message);
         } catch (RecoverableException ex) {
             String errorMessage = format("Failed to find a path. %s", ex.getMessage());
             stateMachine.saveActionToHistory(errorMessage);
             stateMachine.fireError(errorMessage);
 
-            return Optional.of(buildErrorMessage(stateMachine, ErrorType.INTERNAL_ERROR,
-                    getGenericErrorMessage(), errorMessage));
+            Message message = buildErrorMessage(stateMachine, ErrorType.INTERNAL_ERROR,
+                    getGenericErrorMessage(), errorMessage);
+            stateMachine.setOperationResultMessage(message);
+            return Optional.of(message);
         } catch (ResourceAllocationException ex) {
             String errorMessage = format("Failed to allocate flow resources. %s", ex.getMessage());
             stateMachine.saveErrorToHistory(errorMessage, ex);
             stateMachine.fireError(errorMessage);
 
-            return Optional.of(buildErrorMessage(stateMachine, ErrorType.INTERNAL_ERROR,
-                    getGenericErrorMessage(), errorMessage));
+            Message message = buildErrorMessage(stateMachine, ErrorType.INTERNAL_ERROR,
+                    getGenericErrorMessage(), errorMessage);
+            stateMachine.setOperationResultMessage(message);
+            return Optional.of(message);
         }
     }
 
@@ -190,6 +196,12 @@ public abstract class BaseResourceAllocationAction<T extends FlowPathSwappingFsm
 
     protected FlowPathPair createFlowPathPair(Flow flow, FlowPathPair pathsToReuseBandwidth,
                                               PathPair pathPair, FlowResources flowResources) {
+        return createFlowPathPair(flow, pathsToReuseBandwidth, pathPair, flowResources, 0L);
+    }
+
+    protected FlowPathPair createFlowPathPair(Flow flow, FlowPathPair pathsToReuseBandwidth,
+                                              PathPair pathPair, FlowResources flowResources,
+                                              long overprovisionedBandwidth) {
         long cookie = flowResources.getUnmaskedCookie();
         FlowPath newForwardPath = flowPathBuilder.buildFlowPath(flow, flowResources.getForward(),
                 pathPair.getForward(), Cookie.buildForwardCookie(cookie));
@@ -207,14 +219,14 @@ public abstract class BaseResourceAllocationAction<T extends FlowPathSwappingFsm
             flowPathRepository.createOrUpdate(newForwardPath);
             flowPathRepository.createOrUpdate(newReversePath);
 
-            updateIslsForFlowPath(newForwardPath, pathsToReuseBandwidth.getForward());
-            updateIslsForFlowPath(newReversePath, pathsToReuseBandwidth.getReverse());
+            updateIslsForFlowPath(newForwardPath, pathsToReuseBandwidth.getForward(), overprovisionedBandwidth);
+            updateIslsForFlowPath(newReversePath, pathsToReuseBandwidth.getReverse(), overprovisionedBandwidth);
         });
 
         return newFlowPaths;
     }
 
-    private void updateIslsForFlowPath(FlowPath flowPath, FlowPath pathToReuseBandwidth)
+    private void updateIslsForFlowPath(FlowPath flowPath, FlowPath pathToReuseBandwidth, long overprovisionedBandwidth)
             throws ResourceAllocationException {
         for (PathSegment pathSegment : flowPath.getSegments()) {
             log.debug("Updating ISL for the path segment: {}", pathSegment);
@@ -230,6 +242,8 @@ public abstract class BaseResourceAllocationAction<T extends FlowPathSwappingFsm
                     }
                 }
             }
+
+            allowedOverprovisionedBandwidth += overprovisionedBandwidth;
 
             updateAvailableBandwidth(pathSegment.getSrcSwitch().getSwitchId(), pathSegment.getSrcPort(),
                     pathSegment.getDestSwitch().getSwitchId(), pathSegment.getDestPort(),

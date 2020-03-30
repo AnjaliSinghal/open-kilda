@@ -73,6 +73,10 @@ public interface FlowHsTopologyConfig extends AbstractTopologyConfig {
     @Default("30")
     int getUpdateHubTimeoutSeconds();
 
+    @Key("flow.swap.endpoints.hub.timeout.seconds")
+    @Default("30")
+    int getSwapEndpointsHubTimeoutSeconds();
+
     @Key("flow.update.speaker.timeout.seconds")
     @Default("10")
     int getUpdateSpeakerTimeoutSeconds();

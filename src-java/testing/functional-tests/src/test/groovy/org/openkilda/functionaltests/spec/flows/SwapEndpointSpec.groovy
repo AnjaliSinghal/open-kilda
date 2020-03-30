@@ -506,8 +506,9 @@ switches"() {
         then: "An error is received (404 code)"
         def exc = thrown(HttpClientErrorException)
         exc.rawStatusCode == 404
-        exc.responseBodyAsString.to(MessageError).errorMessage == "Can not swap endpoints for flows: " +
-                "Flow ${flow2.id} not found"
+        def error = exc.responseBodyAsString.to(MessageError)
+        error.errorMessage == "Flow ${flow2.id} not found"
+        error.errorDescription == "Could not swap endpoints"
 
         cleanup: "Delete the flow"
         flowHelper.deleteFlow(flow1.id)
@@ -532,8 +533,9 @@ switches"() {
         then: "An error is received (409 code)"
         def exc = thrown(HttpClientErrorException)
         exc.rawStatusCode == 409
-        exc.responseBodyAsString.to(MessageError).errorMessage.contains("Can not swap endpoints for flows: " +
-                "Requested flow '$flow1.id' conflicts with existing flow '$flow3.id'.")
+        def error = exc.responseBodyAsString.to(MessageError)
+        error.errorMessage.contains("Requested flow '$flow1.id' conflicts with existing flow '$flow3.id'.")
+        error.errorDescription == "Could not swap endpoints"
 
         cleanup: "Delete flows"
         [flow1, flow2, flow3].each { flowHelper.deleteFlow(it.id) }
@@ -611,8 +613,9 @@ switches"() {
         then: "An error is received (400 code)"
         def exc = thrown(HttpClientErrorException)
         exc.rawStatusCode == 400
-        exc.responseBodyAsString.to(MessageError).errorMessage == "Can not swap endpoints for flows: " +
-                "New requested endpoint for '$flow2.id' conflicts with existing endpoint for '$flow1.id'"
+        def error = exc.responseBodyAsString.to(MessageError)
+        error.errorMessage == "New requested endpoint for '$flow2.id' conflicts with existing endpoint for '$flow1.id'"
+        error.errorDescription == "Could not swap endpoints"
 
         cleanup: "Delete flows"
         [flow1, flow2].each { flowHelper.deleteFlow(it.id) }
@@ -658,8 +661,9 @@ switches"() {
         then: "An error is received (400 code)"
         def exc = thrown(HttpClientErrorException)
         exc.rawStatusCode == 400
-        exc.responseBodyAsString.to(MessageError).errorMessage == "Can not swap endpoints for flows: " +
-                "The port $islPort on the switch '${swPair.src.dpId}' is occupied by an ISL."
+        def error = exc.responseBodyAsString.to(MessageError)
+        error.errorMessage == "The port $islPort on the switch '${swPair.src.dpId}' is occupied by an ISL."
+        error.errorDescription == "Could not swap endpoints"
 
         cleanup: "Delete flows"
         [flow1, flow2].each { flowHelper.deleteFlow(it.id) }
@@ -823,9 +827,11 @@ switches"() {
         then: "An error is received (400 code)"
         def exc = thrown(HttpClientErrorException)
         exc.rawStatusCode == 400
-        exc.responseBodyAsString.to(MessageError).errorMessage == "Can not swap endpoints for flows: " +
-                "Failed to find path with requested bandwidth=${flow1.maximumBandwidth}: " +
-                "Switch ${flow2SwitchPair.src.dpId} doesn't have links with enough bandwidth"
+        def error = exc.responseBodyAsString.to(MessageError)
+        error.errorMessage.contains("Flow swap endpoints failed. Successfully reverted flows:")
+        !error.errorMessage.contains(flow1.id)
+        error.errorMessage.contains(flow2.id)
+        error.errorDescription == "Could not swap endpoints"
 
         cleanup: "Restore topology and delete flows"
         [flow1, flow2].each { flowHelper.deleteFlow(it.id) }
@@ -968,9 +974,11 @@ switches"() {
         then: "An error is received (400 code)"
         def exc = thrown(HttpClientErrorException)
         exc.rawStatusCode == 400
-        exc.responseBodyAsString.to(MessageError).errorMessage == "Can not swap endpoints for flows: " +
-                "Failed to find path with requested bandwidth=${flow2.maximumBandwidth}: " +
-                "Switch ${flow1SwitchPair.src.dpId} doesn't have links with enough bandwidth"
+        def error = exc.responseBodyAsString.to(MessageError)
+        error.errorMessage.contains("Flow swap endpoints failed. Successfully reverted flows:")
+        error.errorMessage.contains(flow2.id)
+        !error.errorMessage.contains(flow1.id)
+        error.errorDescription == "Could not swap endpoints"
 
         cleanup: "Restore topology and delete flows"
         [flow1, flow2].each { flowHelper.deleteFlow(it.id) }

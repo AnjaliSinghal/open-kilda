@@ -13,20 +13,18 @@
  *   limitations under the License.
  */
 
-package org.openkilda.wfm.topology.flowhs.service;
+package org.openkilda.wfm.error;
 
-import org.openkilda.messaging.Message;
+/**
+ * {@code FlowValidationException} indicates that an error has occurred while passing a flow validation rule.
+ */
+public class FlowValidationException extends Exception {
 
-public interface FlowUpdateHubCarrier extends FlowGenericCarrier {
-    /**
-     * Sends a response to SwapEndpointHub after the update operation is completed.
-     */
-    void sendHubSwapEndpointsResponse(Message message);
+    public FlowValidationException(String message) {
+        super(message);
+    }
 
-    /**
-     * Cancels timeout callback.
-     *
-     * @param key operation identifier.
-     */
-    void cancelTimeoutCallback(String key);
+    public FlowValidationException(String message, Throwable cause) {
+        super(message, cause);
+    }
 }

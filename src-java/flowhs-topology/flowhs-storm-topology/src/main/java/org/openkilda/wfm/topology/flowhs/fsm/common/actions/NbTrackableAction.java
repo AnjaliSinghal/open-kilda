@@ -41,7 +41,7 @@ public abstract class NbTrackableAction<T extends NbTrackableFsm<T, S, E, C>, S,
     @Override
     protected final void perform(S from, S to, E event, C context, T stateMachine) {
         try {
-            performWithResponse(from, to, event, context, stateMachine).ifPresent(stateMachine::sendResponse);
+            performWithResponse(from, to, event, context, stateMachine).ifPresent(stateMachine::sendNorthboundResponse);
         } catch (FlowProcessingException ex) {
             handleError(stateMachine, ex, ex.getErrorType(), false);
         } catch (Exception ex) {
@@ -72,8 +72,8 @@ public abstract class NbTrackableAction<T extends NbTrackableFsm<T, S, E, C>, S,
             stateMachine.saveErrorToHistory(errorMessage);
         }
         stateMachine.fireError(errorMessage);
-
-        stateMachine.sendResponse(buildErrorMessage(
-                stateMachine, errorType, getGenericErrorMessage(), ex.getMessage()));
+        Message message = buildErrorMessage(stateMachine, errorType, getGenericErrorMessage(), ex.getMessage());
+        stateMachine.setOperationResultMessage(message);
+        stateMachine.sendNorthboundResponse(message);
     }
 }

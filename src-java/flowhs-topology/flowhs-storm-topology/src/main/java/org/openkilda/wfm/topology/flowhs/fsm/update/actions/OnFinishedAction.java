@@ -50,5 +50,9 @@ public class OnFinishedAction extends HistoryRecordingAction<FlowUpdateFsm, Stat
                     format("Flow update completed with status %s and error %s", stateMachine.getNewFlowStatus(),
                             stateMachine.getErrorReason()));
         }
+
+        if (stateMachine.getOperationResultMessage() != null && stateMachine.getTargetFlow().isBulkUpdate()) {
+            stateMachine.sendHubSwapEndpointsResponse(stateMachine.getOperationResultMessage());
+        }
     }
 }

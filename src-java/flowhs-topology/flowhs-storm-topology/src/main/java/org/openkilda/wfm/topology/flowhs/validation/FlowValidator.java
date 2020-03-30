@@ -1,4 +1,4 @@
-/* Copyright 2018 Telstra Open Source
+/* Copyright 2020 Telstra Open Source
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
  *   you may not use this file except in compliance with the License.
@@ -29,13 +29,17 @@ import org.openkilda.persistence.repositories.SwitchRepository;
 import org.openkilda.wfm.topology.flowhs.model.RequestedFlow;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.Sets;
+import lombok.Value;
 import org.apache.commons.lang3.StringUtils;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Checks whether flow can be created and has no conflicts with already created ones.
@@ -75,6 +79,28 @@ public class FlowValidator {
         }
     }
 
+    /**
+     * Validates the specified flow when swap endpoint operation.
+     */
+    public void validateForSwapEndpoints(RequestedFlow firstFlow, RequestedFlow secondFlow)
+            throws InvalidFlowException, UnavailableFlowEndpointException {
+        firstFlow.setBulkUpdate(true);
+        firstFlow.setBulkUpdateFlowIds(Sets.newHashSet(secondFlow.getFlowId()));
+        secondFlow.setBulkUpdate(true);
+        secondFlow.setBulkUpdateFlowIds(Sets.newHashSet(firstFlow.getFlowId()));
+
+        checkFlowForIslConflicts(firstFlow);
+        checkFlowForIslConflicts(secondFlow);
+        checkFlowForEndpointConflicts(firstFlow);
+        checkFlowForEndpointConflicts(secondFlow);
+        checkOneSwitchFlowHasNoConflicts(firstFlow);
+        checkOneSwitchFlowHasNoConflicts(secondFlow);
+        checkSwitchesExistsAndActive(firstFlow);
+        checkSwitchesExistsAndActive(secondFlow);
+
+        checkForEqualsEndpoints(firstFlow, secondFlow);
+    }
+
     @VisibleForTesting
     void checkBandwidth(RequestedFlow flow) throws InvalidFlowException {
         if (flow.getBandwidth() < 0) {
@@ -112,15 +138,23 @@ public class FlowValidator {
      */
     @VisibleForTesting
     void checkFlowForEndpointConflicts(RequestedFlow flow) throws InvalidFlowException {
-        checkEndpoint(flow.getFlowId(), flow.getSrcSwitch(), flow.getSrcPort(), flow.getSrcVlan(), true);
-        checkEndpoint(flow.getFlowId(), flow.getDestSwitch(), flow.getDestPort(), flow.getDestVlan(), false);
+        Set<String> bulkUpdateFlowIds = new HashSet<>();
+        if (flow.isBulkUpdate() && flow.getBulkUpdateFlowIds() != null) {
+            bulkUpdateFlowIds = new HashSet<>(flow.getBulkUpdateFlowIds());
+        }
+        bulkUpdateFlowIds.add(flow.getFlowId());
+        checkEndpoint(flow.getFlowId(), flow.getSrcSwitch(), flow.getSrcPort(), flow.getSrcVlan(), true,
+                bulkUpdateFlowIds);
+        checkEndpoint(flow.getFlowId(), flow.getDestSwitch(), flow.getDestPort(), flow.getDestVlan(), false,
+                bulkUpdateFlowIds);
     }
 
-    private void checkEndpoint(String flowId, SwitchId switchId, int portNo, int vlanId, boolean isSource)
+    private void checkEndpoint(String flowId, SwitchId switchId, int portNo, int vlanId, boolean isSource,
+                               Set<String> bulkUpdateFlowIds)
             throws InvalidFlowException {
         Collection<Flow> conflicts = flowRepository.findByEndpoint(switchId, portNo);
         Optional<Flow> conflictOnSource = conflicts.stream()
-                .filter(flow -> !flowId.equals(flow.getFlowId()))
+                .filter(flow -> !bulkUpdateFlowIds.contains(flow.getFlowId()))
                 .filter(flow -> (flow.getSrcSwitch().getSwitchId().equals(switchId)
                         && flow.getSrcPort() == portNo
                         && (flow.getSrcVlan() == vlanId)))
@@ -142,7 +176,7 @@ public class FlowValidator {
         }
 
         Optional<Flow> conflictOnDest = conflicts.stream()
-                .filter(flow -> !flowId.equals(flow.getFlowId()))
+                .filter(flow -> !bulkUpdateFlowIds.contains(flow.getFlowId()))
                 .filter(flow -> flow.getDestSwitch().getSwitchId().equals(switchId)
                         && flow.getDestPort() == portNo
                         && (flow.getDestVlan() == vlanId))
@@ -287,5 +321,50 @@ public class FlowValidator {
                         switchId));
             }
         }
+    }
+
+    /**
+     * Check for equals endpoints.
+     *
+     * @param firstFlow a first flow.
+     * @param secondFlow a second flow.
+     */
+    @VisibleForTesting
+    void checkForEqualsEndpoints(RequestedFlow firstFlow, RequestedFlow secondFlow) throws InvalidFlowException {
+        List<Endpoint> endpoints = new ArrayList<>();
+        endpoints.add(new Endpoint(firstFlow.getSrcSwitch(),
+                firstFlow.getSrcPort(), firstFlow.getSrcVlan()));
+        endpoints.add(new Endpoint(firstFlow.getDestSwitch(),
+                firstFlow.getDestPort(), firstFlow.getDestVlan()));
+        endpoints.add(new Endpoint(secondFlow.getSrcSwitch(),
+                secondFlow.getSrcPort(), secondFlow.getSrcVlan()));
+        endpoints.add(new Endpoint(secondFlow.getDestSwitch(),
+                secondFlow.getDestPort(), secondFlow.getDestVlan()));
+
+        Set<Endpoint> checkSet = new HashSet<>();
+        for (Endpoint endpoint : endpoints) {
+            if (!checkSet.contains(endpoint)) {
+                checkSet.add(endpoint);
+            } else {
+                String message = "New requested endpoint for '%s' conflicts with existing endpoint for '%s'";
+                if (checkSet.size() <= 1) {
+                    message = String.format(message, firstFlow.getFlowId(), firstFlow.getFlowId());
+                } else {
+                    if (endpoints.indexOf(endpoint) <= 1) {
+                        message = String.format(message, secondFlow.getFlowId(), firstFlow.getFlowId());
+                    } else {
+                        message = String.format(message, secondFlow.getFlowId(), secondFlow.getFlowId());
+                    }
+                }
+                throw new InvalidFlowException(message, ErrorType.DATA_INVALID);
+            }
+        }
+    }
+
+    @Value
+    private static class Endpoint {
+        SwitchId switchId;
+        Integer portNumber;
+        Integer vlanId;
     }
 }
