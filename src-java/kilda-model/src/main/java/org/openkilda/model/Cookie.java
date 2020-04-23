@@ -95,6 +95,7 @@ public class Cookie implements Comparable<Cookie>, Serializable {
     public static final long MULTITABLE_ISL_VXLAN_TRANSIT_RULES_TYPE = 0x0040_0000_0000_0000L;
     public static final long MULTITABLE_INGRESS_RULES_TYPE           = 0x0050_0000_0000_0000L;
     public static final long ARP_INPUT_CUSTOMER_TYPE                 = 0x0060_0000_0000_0000L;
+    public static final long SERVER_42_INPUT_TYPE                    = 0x0070_0000_0000_0000L;
 
     private final long value;
 
@@ -142,6 +143,10 @@ public class Cookie implements Comparable<Cookie>, Serializable {
 
     public static long encodeArpInputCustomer(int port) {
         return port | Cookie.ARP_INPUT_CUSTOMER_TYPE | Cookie.DEFAULT_RULE_FLAG;
+    }
+
+    public static long encodeServer42InputInput(int port) {
+        return port | Cookie.SERVER_42_INPUT_TYPE | Cookie.DEFAULT_RULE_FLAG;
     }
 
     /**
@@ -223,6 +228,10 @@ public class Cookie implements Comparable<Cookie>, Serializable {
 
     public static boolean isIngressRulePassThrough(long value) {
         return (TYPE_MASK & value) == Cookie.MULTITABLE_INGRESS_RULES_TYPE;
+    }
+
+    public static boolean isServer42Input(long value) {
+        return (TYPE_MASK & value) == Cookie.SERVER_42_INPUT_TYPE;
     }
 
     public static long getValueFromIntermediateCookie(long value) {

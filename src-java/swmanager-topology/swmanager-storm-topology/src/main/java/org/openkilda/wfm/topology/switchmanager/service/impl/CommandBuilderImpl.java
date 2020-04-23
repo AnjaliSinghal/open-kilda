@@ -134,7 +134,8 @@ public class CommandBuilderImpl implements CommandBuilder {
      */
     private static boolean isDefaultRuleWithSpecialRequirements(long cookie) {
         return cookie == SERVER_42_OUTPUT_VLAN_COOKIE
-                || cookie == SERVER_42_OUTPUT_VXLAN_COOKIE;
+                || cookie == SERVER_42_OUTPUT_VXLAN_COOKIE
+                || Cookie.isServer42Input(cookie);
     }
 
     /**
@@ -164,6 +165,11 @@ public class CommandBuilderImpl implements CommandBuilder {
                 commands.add(command
                         .id("SWMANAGER_SERVER_42_OUTPUT_VXLAN_RULE_INSTALL")
                         .outputPort(properties.getServer42Port())
+                        .build());
+            } else if (Cookie.isServer42Input(cookie)) {
+                commands.add(command
+                        .id("SWMANAGER_SERVER_42_INPUT_RULE_INSTALL")
+                        .inputPort(properties.getServer42Port())
                         .build());
             } else {
                 log.warn("Got request for installation of unknown rule {} on switch {}", cookie, switchId);
