@@ -21,6 +21,7 @@ import org.openkilda.floodlight.command.flow.ingress.of.IngressFlowSegmentInstal
 import org.openkilda.floodlight.command.flow.ingress.of.IngressFlowSegmentInstallSingleTableFlowModFactory;
 import org.openkilda.floodlight.model.FlowSegmentMetadata;
 import org.openkilda.floodlight.model.RulesContext;
+import org.openkilda.floodlight.switchmanager.factory.generator.server42.Server42InputFlowGenerator;
 import org.openkilda.messaging.MessageContext;
 import org.openkilda.model.FlowEncapsulationType;
 import org.openkilda.model.FlowEndpoint;
@@ -36,6 +37,7 @@ import lombok.Getter;
 import org.projectfloodlight.openflow.protocol.OFFlowMod;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -95,6 +97,16 @@ public class IngressFlowSegmentInstallCommand extends IngressFlowSegmentCommand 
 
             if (getEndpoint().isTrackArpConnectedDevices()) {
                 ofMessages.add(getFlowModFactory().makeArpInputCustomerFlowMessage());
+            }
+
+            if (rulesContext.isInstallServer42InputRule()) {
+                Optional<OFFlowMod> server42InputRule = getFlowModFactory().makeServer42InputFlowMessage();
+                if (server42InputRule.isPresent()) {
+                    ofMessages.add(server42InputRule.get());
+                } else {
+                    log.info("Skip installation of server 42 input rule for flow witch cookie {} on switch {}",
+                            getCookie(), getSwitchId());
+                }
             }
         }
         return ofMessages;

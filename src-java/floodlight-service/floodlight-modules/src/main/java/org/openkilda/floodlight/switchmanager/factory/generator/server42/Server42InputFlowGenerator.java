@@ -32,6 +32,7 @@ import org.openkilda.floodlight.service.FeatureDetectorService;
 import org.openkilda.floodlight.switchmanager.factory.SwitchFlowTuple;
 import org.openkilda.floodlight.switchmanager.factory.generator.SwitchFlowGenerator;
 import org.openkilda.floodlight.utils.metadata.RoutingMetadata;
+import org.openkilda.model.MacAddress;
 import org.openkilda.model.SwitchFeature;
 
 import com.google.common.collect.ImmutableList;
@@ -51,6 +52,7 @@ import org.projectfloodlight.openflow.types.TableId;
 import org.projectfloodlight.openflow.types.TransportPort;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 public class Server42InputFlowGenerator implements SwitchFlowGenerator {
@@ -60,24 +62,29 @@ public class Server42InputFlowGenerator implements SwitchFlowGenerator {
     private FeatureDetectorService featureDetectorService;
     private int server42Port;
     private int customerPort;
+    private MacAddress server42macAddress;
 
     @Builder
     public Server42InputFlowGenerator(
-            FeatureDetectorService featureDetectorService, int server42Port, int customerPort) {
+            FeatureDetectorService featureDetectorService, int server42Port, int customerPort,
+            MacAddress server42macAddress) {
         this.featureDetectorService = featureDetectorService;
         this.server42Port = server42Port;
         this.customerPort = customerPort;
+        this.server42macAddress = server42macAddress;
     }
 
-    @Override
-    public SwitchFlowTuple generateFlow(IOFSwitch sw) {
-        Set<SwitchFeature> features = featureDetectorService.detectSwitch(sw);
+    /**
+     * Generated OFFlowMod for Server 42 input rule.
+     */
+    public static Optional<OFFlowMod> generateFlowMod(
+            OFFactory ofFactory, Set<SwitchFeature> features, int customerPort, int server42Port,
+            MacAddress server42macAddress) {
         if (!features.contains(NOVIFLOW_COPY_FIELD)) {
-            return SwitchFlowTuple.EMPTY;
+            return Optional.empty();
         }
 
-        OFFactory ofFactory = sw.getOFFactory();
-        Match match = buildMatch(ofFactory, server42Port, customerPort + UDP_PORT_OFFSET); // use free udp ports
+        Match match = buildMatch(ofFactory, server42Port, customerPort + UDP_PORT_OFFSET, server42macAddress);
 
         List<OFAction> actions = ImmutableList.of(
                 actionSetUdpSrcAction(ofFactory, TransportPort.of(SERVER_42_FORWARD_UDP_PORT)),
@@ -89,20 +96,35 @@ public class Server42InputFlowGenerator implements SwitchFlowGenerator {
                 instructionWriteMetadata(ofFactory, customerPort, features),
                 instructionGoToTable(ofFactory, TableId.of(PRE_INGRESS_TABLE_ID)));
 
-        OFFlowMod flowMod = prepareFlowModBuilder(
+        return Optional.of(prepareFlowModBuilder(
                 ofFactory, encodeServer42InputInput(customerPort), SERVER_42_INPUT_PRIORITY, INPUT_TABLE_ID)
                 .setMatch(match)
                 .setInstructions(instructions)
-                .build();
+                .build());
+    }
+
+    @Override
+    public SwitchFlowTuple generateFlow(IOFSwitch sw) {
+        Set<SwitchFeature> features = featureDetectorService.detectSwitch(sw);
+        Optional<OFFlowMod> flowMod = generateFlowMod(
+                sw.getOFFactory(), features, server42Port, customerPort, server42macAddress);
+
+        if (!flowMod.isPresent()) {
+            return SwitchFlowTuple.EMPTY;
+        }
+
         return SwitchFlowTuple.builder()
                 .sw(sw)
-                .flow(flowMod)
+                .flow(flowMod.get())
                 .build();
     }
 
-    private static Match buildMatch(OFFactory ofFactory, int server42Port, int udpSrcPort) {
+    private static Match buildMatch(OFFactory ofFactory, int server42Port, int udpSrcPort,
+                                    MacAddress server42macAddress) {
         return ofFactory.buildMatch()
                 .setExact(MatchField.IN_PORT, OFPort.of(server42Port))
+                .setExact(MatchField.ETH_SRC, org.projectfloodlight.openflow.types.MacAddress.of(
+                        server42macAddress.toString()))
                 .setExact(MatchField.ETH_TYPE, EthType.IPv4)
                 .setExact(MatchField.IP_PROTO, IpProtocol.UDP)
                 .setExact(MatchField.UDP_SRC, TransportPort.of(udpSrcPort))
