@@ -15,6 +15,8 @@
 
 package org.openkilda.wfm.share.model;
 
+import org.openkilda.model.MacAddress;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -25,10 +27,33 @@ import lombok.EqualsAndHashCode;
 @AllArgsConstructor
 @EqualsAndHashCode
 public class SpeakerRequestBuildContext {
-    private boolean removeCustomerPortRule;
-    private boolean removeOppositeCustomerPortRule;
-    private boolean removeCustomerPortLldpRule;
-    private boolean removeOppositeCustomerPortLldpRule;
-    private boolean removeCustomerPortArpRule;
-    private boolean removeOppositeCustomerPortArpRule;
+    public static final SpeakerRequestBuildContext EMPTY = SpeakerRequestBuildContext.builder()
+            .forward(PathContext.builder().build())
+            .reverse(PathContext.builder().build())
+            .build();
+
+    private PathContext forward;
+    private PathContext reverse;
+
+
+    /**
+     * Swap forward and reverse PathContext.
+     */
+    public void swap() {
+        PathContext temporary = forward;
+        forward = reverse;
+        reverse = temporary;
+    }
+
+    @Data
+    @Builder
+    public static class PathContext {
+        private boolean removeCustomerPortRule;
+        private boolean removeCustomerPortLldpRule;
+        private boolean removeCustomerPortArpRule;
+        private boolean removeServer42InputRule;
+        private boolean installServer42InputRule;
+        private Integer server42Port;
+        private MacAddress server42MacAddress;
+    }
 }

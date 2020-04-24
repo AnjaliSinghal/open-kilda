@@ -15,16 +15,14 @@
 
 package org.openkilda.wfm.topology.flowhs.fsm.common.actions;
 
-import static java.lang.String.format;
-
-import org.openkilda.messaging.error.ErrorType;
 import org.openkilda.model.Flow;
 import org.openkilda.model.SwitchId;
 import org.openkilda.model.SwitchProperties;
 import org.openkilda.persistence.PersistenceManager;
 import org.openkilda.persistence.repositories.SwitchPropertiesRepository;
 import org.openkilda.wfm.share.flow.resources.FlowResourcesManager;
-import org.openkilda.wfm.topology.flowhs.exception.FlowProcessingException;
+import org.openkilda.wfm.share.model.SpeakerRequestBuildContext;
+import org.openkilda.wfm.share.model.SpeakerRequestBuildContext.PathContext;
 import org.openkilda.wfm.topology.flowhs.fsm.common.FlowProcessingFsm;
 import org.openkilda.wfm.topology.flowhs.model.RequestedFlow;
 import org.openkilda.wfm.topology.flowhs.service.FlowCommandBuilderFactory;
@@ -91,12 +89,6 @@ public abstract class BaseFlowRuleRemovalAction<T extends FlowProcessingFsm<T, S
                 .collect(Collectors.toList());
     }
 
-    private SwitchProperties getSwitchProperties(SwitchId ingressSwitchId) {
-        return switchPropertiesRepository.findBySwitchId(ingressSwitchId)
-                .orElseThrow(() -> new FlowProcessingException(ErrorType.NOT_FOUND,
-                        format("Properties for switch %s not found", ingressSwitchId)));
-    }
-
     protected boolean removeForwardCustomerPortSharedCatchRule(RequestedFlow oldFlow, RequestedFlow newFlow) {
         boolean srcPortChanged = oldFlow.getSrcPort() != newFlow.getSrcPort();
 
@@ -141,5 +133,38 @@ public abstract class BaseFlowRuleRemovalAction<T extends FlowProcessingFsm<T, S
 
         return dstArpWasSwitchedOff && isFlowTheLastUserOfSharedArpPortRule(
                 oldFlow.getFlowId(), oldFlow.getDestSwitch(), oldFlow.getDestPort());
+    }
+
+    protected SpeakerRequestBuildContext buildSpeakerContextForRemoval(RequestedFlow oldFlow, RequestedFlow newFlow) {
+        SwitchProperties srcSwitchProperties = getSwitchProperties(oldFlow.getSrcSwitch());
+        boolean removeForwardCustomerPortRule = removeForwardCustomerPortSharedCatchRule(oldFlow, newFlow);
+
+        PathContext forwardPathContext = PathContext.builder()
+                .removeCustomerPortRule(removeForwardCustomerPortRule)
+                .removeCustomerPortLldpRule(removeForwardSharedLldpRule(oldFlow, newFlow))
+                .removeCustomerPortArpRule(removeForwardSharedArpRule(oldFlow, newFlow))
+                // requirements for server 42 input rule removing are the same as for customer port shared rule
+                .removeServer42InputRule(srcSwitchProperties.isServer42FlowRtt() && removeForwardCustomerPortRule)
+                .server42Port(srcSwitchProperties.getServer42Port())
+                .server42MacAddress(srcSwitchProperties.getServer42MacAddress())
+                .build();
+
+        SwitchProperties dstSwitchProperties = getSwitchProperties(oldFlow.getDestSwitch());
+        boolean removeReverseCustomerPortRule = removeReverseCustomerPortSharedCatchRule(oldFlow, newFlow);
+
+        PathContext reversePathContext = PathContext.builder()
+                .removeCustomerPortRule(removeReverseCustomerPortRule)
+                .removeCustomerPortLldpRule(removeReverseSharedLldpRule(oldFlow, newFlow))
+                .removeCustomerPortArpRule(removeReverseSharedArpRule(oldFlow, newFlow))
+                // requirements for server 42 input rule removing are the same as for customer port shared rule
+                .removeServer42InputRule(dstSwitchProperties.isServer42FlowRtt() && removeReverseCustomerPortRule)
+                .server42Port(dstSwitchProperties.getServer42Port())
+                .server42MacAddress(dstSwitchProperties.getServer42MacAddress())
+                .build();
+
+        return SpeakerRequestBuildContext.builder()
+                .forward(forwardPathContext)
+                .reverse(reversePathContext)
+                .build();
     }
 }

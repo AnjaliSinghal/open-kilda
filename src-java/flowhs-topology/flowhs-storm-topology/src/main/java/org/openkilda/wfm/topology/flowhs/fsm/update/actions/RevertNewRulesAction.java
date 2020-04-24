@@ -57,8 +57,11 @@ public class RevertNewRulesAction extends BaseFlowRuleRemovalAction<FlowUpdateFs
         if (stateMachine.getOldPrimaryForwardPath() != null && stateMachine.getOldPrimaryReversePath() != null) {
             FlowPath oldForward = getFlowPath(flow, stateMachine.getOldPrimaryForwardPath());
             FlowPath oldReverse = getFlowPath(flow, stateMachine.getOldPrimaryReversePath());
+
+            SpeakerRequestBuildContext speakerContext = buildBaseSpeakerContextForInstall(
+                    oldForward.getSrcSwitch().getSwitchId(), oldReverse.getSrcSwitch().getSwitchId());
             installCommands.addAll(commandBuilder.buildIngressOnly(
-                    stateMachine.getCommandContext(), flow, oldForward, oldReverse));
+                    stateMachine.getCommandContext(), flow, oldForward, oldReverse, speakerContext));
         }
 
         stateMachine.getIngressCommands().clear();  // need to clean previous requests
@@ -74,7 +77,7 @@ public class RevertNewRulesAction extends BaseFlowRuleRemovalAction<FlowUpdateFs
             FlowPath newReverse = getFlowPath(flow, stateMachine.getNewPrimaryReversePath());
             removeCommands.addAll(commandBuilder.buildAll(
                     stateMachine.getCommandContext(), flow, newForward, newReverse,
-                    getSpeakerRequestBuildContext(stateMachine)));
+                    getSpeakerRequestBuildContextForRemoval(stateMachine)));
         }
         if (stateMachine.getNewProtectedForwardPath() != null && stateMachine.getNewProtectedReversePath() != null) {
             FlowPath newForward = getFlowPath(flow, stateMachine.getNewProtectedForwardPath());
@@ -95,17 +98,10 @@ public class RevertNewRulesAction extends BaseFlowRuleRemovalAction<FlowUpdateFs
                 "Commands for removing new rules and re-installing original ingress rule have been sent");
     }
 
-    private SpeakerRequestBuildContext getSpeakerRequestBuildContext(FlowUpdateFsm stateMachine) {
+    private SpeakerRequestBuildContext getSpeakerRequestBuildContextForRemoval(FlowUpdateFsm stateMachine) {
         RequestedFlow originalFlow = stateMachine.getOriginalFlow();
         RequestedFlow targetFlow = stateMachine.getTargetFlow();
 
-        return SpeakerRequestBuildContext.builder()
-                .removeCustomerPortRule(removeForwardCustomerPortSharedCatchRule(targetFlow, originalFlow))
-                .removeOppositeCustomerPortRule(removeReverseCustomerPortSharedCatchRule(targetFlow, originalFlow))
-                .removeCustomerPortLldpRule(removeForwardSharedLldpRule(targetFlow, originalFlow))
-                .removeOppositeCustomerPortLldpRule(removeReverseSharedLldpRule(targetFlow, originalFlow))
-                .removeCustomerPortArpRule(removeForwardSharedArpRule(targetFlow, originalFlow))
-                .removeOppositeCustomerPortArpRule(removeReverseSharedArpRule(targetFlow, originalFlow))
-                .build();
+        return buildSpeakerContextForRemoval(targetFlow, originalFlow);
     }
 }

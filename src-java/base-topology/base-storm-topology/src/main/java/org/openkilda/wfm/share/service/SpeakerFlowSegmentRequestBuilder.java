@@ -38,6 +38,7 @@ import org.openkilda.wfm.CommandContext;
 import org.openkilda.wfm.share.flow.resources.EncapsulationResources;
 import org.openkilda.wfm.share.flow.resources.FlowResourcesManager;
 import org.openkilda.wfm.share.model.SpeakerRequestBuildContext;
+import org.openkilda.wfm.share.model.SpeakerRequestBuildContext.PathContext;
 import org.openkilda.wfm.topology.flowhs.service.FlowCommandBuilder;
 
 import com.fasterxml.uuid.Generators;
@@ -60,7 +61,7 @@ public class SpeakerFlowSegmentRequestBuilder implements FlowCommandBuilder {
     @Override
     public List<FlowSegmentRequestFactory> buildAll(
             CommandContext context, Flow flow, FlowPath forwardPath, FlowPath reversePath) {
-        return buildAll(context, flow, forwardPath, reversePath, SpeakerRequestBuildContext.builder().build());
+        return buildAll(context, flow, forwardPath, reversePath, SpeakerRequestBuildContext.EMPTY);
     }
 
     @Override
@@ -79,19 +80,22 @@ public class SpeakerFlowSegmentRequestBuilder implements FlowCommandBuilder {
     public List<FlowSegmentRequestFactory> buildAllExceptIngress(
             CommandContext context, Flow flow, FlowPath path, FlowPath oppositePath) {
         return makeRequests(context, flow, path, oppositePath, false, true, true,
-                SpeakerRequestBuildContext.builder().build());
-    }
-
-    @Override
-    public List<FlowSegmentRequestFactory> buildIngressOnly(CommandContext context, @NonNull Flow flow) {
-        return buildIngressOnly(context, flow, flow.getForwardPath(), flow.getReversePath());
+                SpeakerRequestBuildContext.EMPTY);
     }
 
     @Override
     public List<FlowSegmentRequestFactory> buildIngressOnly(
-            CommandContext context, Flow flow, FlowPath path, FlowPath oppositePath) {
+            CommandContext context, @NonNull Flow flow, SpeakerRequestBuildContext speakerRequestBuildContext) {
+        return buildIngressOnly(context, flow, flow.getForwardPath(), flow.getReversePath(),
+                speakerRequestBuildContext);
+    }
+
+    @Override
+    public List<FlowSegmentRequestFactory> buildIngressOnly(
+            CommandContext context, Flow flow, FlowPath path, FlowPath oppositePath,
+            SpeakerRequestBuildContext speakerRequestBuildContext) {
         return makeRequests(context, flow, path, oppositePath, true, false, false,
-                SpeakerRequestBuildContext.builder().build());
+                speakerRequestBuildContext);
     }
 
     private List<FlowSegmentRequestFactory> makeRequests(
@@ -101,14 +105,7 @@ public class SpeakerFlowSegmentRequestBuilder implements FlowCommandBuilder {
         if (path == null) {
             path = oppositePath;
             oppositePath = null;
-            speakerRequestBuildContext = SpeakerRequestBuildContext.builder()
-                    .removeCustomerPortRule(speakerRequestBuildContext.isRemoveOppositeCustomerPortRule())
-                    .removeOppositeCustomerPortRule(speakerRequestBuildContext.isRemoveCustomerPortRule())
-                    .removeCustomerPortLldpRule(speakerRequestBuildContext.isRemoveOppositeCustomerPortLldpRule())
-                    .removeOppositeCustomerPortLldpRule(speakerRequestBuildContext.isRemoveCustomerPortLldpRule())
-                    .removeCustomerPortArpRule(speakerRequestBuildContext.isRemoveOppositeCustomerPortArpRule())
-                    .removeOppositeCustomerPortArpRule(speakerRequestBuildContext.isRemoveCustomerPortArpRule())
-                    .build();
+            speakerRequestBuildContext.swap();
         }
         if (path == null) {
             throw new IllegalArgumentException("At least one flow path must be not null");
@@ -122,22 +119,27 @@ public class SpeakerFlowSegmentRequestBuilder implements FlowCommandBuilder {
         }
 
         List<FlowSegmentRequestFactory> requests = new ArrayList<>(makePathRequests(flow, path, context, encapsulation,
-                doIngress, doTransit, doEgress, new RulesContext(
-                        speakerRequestBuildContext.isRemoveCustomerPortRule(),
-                        speakerRequestBuildContext.isRemoveCustomerPortLldpRule(),
-                        speakerRequestBuildContext.isRemoveCustomerPortArpRule())));
+                doIngress, doTransit, doEgress, createRulesContext(speakerRequestBuildContext.getForward())));
         if (oppositePath != null) {
             if (!flow.isOneSwitchFlow()) {
                 encapsulation = getEncapsulation(
                         flow.getEncapsulationType(), oppositePath.getPathId(), path.getPathId());
             }
             requests.addAll(makePathRequests(flow, oppositePath, context, encapsulation, doIngress, doTransit, doEgress,
-                    new RulesContext(
-                            speakerRequestBuildContext.isRemoveOppositeCustomerPortRule(),
-                            speakerRequestBuildContext.isRemoveOppositeCustomerPortLldpRule(),
-                            speakerRequestBuildContext.isRemoveOppositeCustomerPortArpRule())));
+                    createRulesContext(speakerRequestBuildContext.getReverse())));
         }
         return requests;
+    }
+
+    private RulesContext createRulesContext(PathContext pathContext) {
+        return new RulesContext(
+                pathContext.isRemoveCustomerPortRule(),
+                pathContext.isRemoveCustomerPortLldpRule(),
+                pathContext.isRemoveCustomerPortArpRule(),
+                pathContext.isRemoveServer42InputRule(),
+                pathContext.isInstallServer42InputRule(),
+                pathContext.getServer42Port(),
+                pathContext.getServer42MacAddress());
     }
 
     @SuppressWarnings("squid:S00107")
